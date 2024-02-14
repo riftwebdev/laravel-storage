@@ -97,7 +97,7 @@ class RiftStorage
         return null;
     }
 
-    public function delete($path, $disk = 'public'): bool
+    public static function delete($path, $disk = 'public'): bool
     {
         try {
             if (is_null($path)) {
