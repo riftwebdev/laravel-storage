@@ -129,7 +129,7 @@ class RiftStorage
         try {
             $path = self::preparePathForStorage($path);
 
-            if (!self::fileExists($path)) {
+            if (!self::exists($path)) {
                 return true;
             }
 
@@ -156,10 +156,10 @@ class RiftStorage
         return str($path)->replaceFirst('storage/', '');
     }
 
-    public static function fileExists(string $path): bool
+    public static function exists(string $path, string $disk = 'public'): bool
     {
         try {
-            return Storage::disk('public')->exists($path);
+            return Storage::disk($disk)->exists($path);
         } catch (Throwable $e) {
             report($e);
         }
