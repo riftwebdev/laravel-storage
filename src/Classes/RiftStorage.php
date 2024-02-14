@@ -13,11 +13,11 @@ class RiftStorage
 {
     public static function store(
         ?UploadedFile $requestFile,
-                      $path,
-                      $disk = 'public',
-                      $shouldResize = false,
-                      $width = 900,
-                      $height = 900
+        string        $path = '',
+        string        $disk = 'public',
+        bool          $shouldResize = false,
+        int           $width = 900,
+        int           $height = 900
     ): ?string
     {
         try {
@@ -40,28 +40,45 @@ class RiftStorage
 
         } catch (Throwable $e) {
             report($e);
-            return null;
         }
+
+        return null;
     }
 
     private static function getStoragePathClean($path, $disk = 'public'): ?string
     {
         try {
             $storageFileUrl = Storage::disk($disk)->url($path);
-            return str_replace(config('app.url'), '', $storageFileUrl);
+
+            return str_replace(self::getDomain(), '', $storageFileUrl);
         } catch (Throwable $e) {
             report($e);
-            return null;
         }
+
+        return null;
     }
 
-    public static function resizeImage($path, $width = 900, $height = 900): bool
+    private static function getDomain(): string
+    {
+        $domain = config('app.url');
+        if (!str($domain)->endsWith('/')) {
+            $domain .= '/';
+        }
+
+        return $domain;
+    }
+
+    public static function resizeImage(
+        string $path,
+        int    $width = 900,
+        int    $height = 900
+    ): bool
     {
         try {
-            Image::useImageDriver(ImageDriver::Gd)
+            $a = Image::useImageDriver(ImageDriver::Gd)
                 ->loadFile($path)
                 ->fit(Fit::Contain, $width, $height)
-                ->save();
+                ->save($path);
 
             return true;
         } catch (Throwable $e) {
@@ -70,7 +87,13 @@ class RiftStorage
         }
     }
 
-    public static function storeRaw($content, $extension, $path, $filename = null, $disk = 'public'): ?string
+    public static function storeRaw(
+        mixed   $content,
+        string  $extension,
+        string  $path = '',
+        ?string $filename = null,
+        string  $disk = 'public'
+    ): ?string
     {
         try {
             if (is_null($content)) {
@@ -81,10 +104,14 @@ class RiftStorage
                 $filename = str()->uuid()->toString();
             }
 
-            $fullPath = $path . '/' . "$filename.$extension";
+            $fullPath = (
+                str($path)->isNotEmpty()
+                    ? $path . '/'
+                    : ''
+                ) . "$filename.$extension";
 
-            if (!str($fullPath)->startsWith('/')) {
-                $fullPath = "/$fullPath";
+            if (str($fullPath)->startsWith('/')) {
+                $fullPath = str($fullPath)->replaceFirst('/', '');
             }
 
             if (Storage::disk($disk)->put($fullPath, $content)) {
@@ -97,18 +124,46 @@ class RiftStorage
         return null;
     }
 
-    public static function delete($path, $disk = 'public'): bool
+    public static function delete(string $path, string $disk = 'public'): bool
     {
         try {
-            if (is_null($path)) {
-                return false;
-            }
+            $path = self::preparePathForStorage($path);
 
+            if (!self::fileExists($path)) {
+                return true;
+            }
 
             return Storage::disk($disk)->delete($path);
         } catch (Throwable $e) {
             report($e);
-            return false;
         }
+
+        return false;
+    }
+
+    private static function preparePathForStorage(string $path): ?string
+    {
+        $startsWithStorageSlash = str($path)->startsWith('storage/');
+        $startsWithSlashStorageSlash = str($path)->startsWith('/storage/');
+        if (str($path)->isEmpty() || (!$startsWithSlashStorageSlash && !$startsWithStorageSlash)) {
+            return $path;
+        }
+
+        if ($startsWithSlashStorageSlash) {
+            return str($path)->replaceFirst('/storage/', '');
+        }
+
+        return str($path)->replaceFirst('storage/', '');
+    }
+
+    public static function fileExists(string $path): bool
+    {
+        try {
+            return Storage::disk('public')->exists($path);
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return false;
     }
 }
