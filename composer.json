@@ -30,7 +30,7 @@
     "prefer-stable": true,
     "autoload": {
         "psr-4": {
-            "Riftweb\\RiftStorage\\": "src/"
+            "Riftweb\\Storage\\": "src/"
         }
     },
     "config": {
