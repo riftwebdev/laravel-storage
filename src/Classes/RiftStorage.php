@@ -145,17 +145,16 @@ class RiftStorage
     }
 
     public static function download(
-        string $path,
+        string  $path,
         ?string $fileName = null,
-        string $disk = 'public'
+        string  $disk = 'public'
     ): ?StreamedResponse
     {
         try {
-
             $path = self::preparePathForStorage($path);
 
             if (!self::exists($path)) {
-                throw new Exception("File not found",404);
+                throw new Exception("File not found", 404);
             }
 
             return Storage::disk($disk)
@@ -163,7 +162,6 @@ class RiftStorage
                     $path,
                     $fileName ?? str()->uuid()->tostring(),
                 );
-
         } catch (Throwable $e) {
             report($e);
         }
@@ -196,5 +194,4 @@ class RiftStorage
 
         return false;
     }
-
 }
