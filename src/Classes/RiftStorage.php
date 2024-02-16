@@ -2,12 +2,15 @@
 
 namespace Riftweb\Storage\Classes;
 
+use Exception;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Image\Enums\Fit;
 use Spatie\Image\Enums\ImageDriver;
 use Spatie\Image\Image;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
+
 
 class RiftStorage
 {
@@ -141,6 +144,33 @@ class RiftStorage
         return false;
     }
 
+    public static function download(
+        string $path,
+        ?string $fileName = null,
+        string $disk = 'public'
+    ): ?StreamedResponse
+    {
+        try {
+
+            $path = self::preparePathForStorage($path);
+
+            if (!self::exists($path)) {
+                throw new Exception("File not found",404);
+            }
+
+            return Storage::disk($disk)
+                ->download(
+                    $path,
+                    $fileName ?? str()->uuid()->tostring(),
+                );
+
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return null;
+    }
+
     private static function preparePathForStorage(string $path): ?string
     {
         $startsWithStorageSlash = str($path)->startsWith('storage/');
@@ -166,4 +196,5 @@ class RiftStorage
 
         return false;
     }
+
 }
