@@ -1,6 +1,6 @@
 {
     "name": "riftweb/storage",
-    "description": "A Laravel package for storage services",
+    "description": "Laravel package that simplifies storage services. It provides methods for storing files, retrieving paths, resizing images, and more. Developed by Leandro Santos, it uses the Spatie Image library for image manipulation and is compatible with PHP 7.3 and 8.0.",
     "license": "MIT",
     "keywords": [
         "riftweb",
