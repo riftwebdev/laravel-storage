@@ -14,6 +14,7 @@ class FilePath
     public string $preparedPathForStorage;
     public ?int $size;
     public ?string $mimeType;
+    public ?string $extension;
     public ?Carbon $lastModified;
     public bool $exists;
 
@@ -31,13 +32,18 @@ class FilePath
 
         $this->storagePathClean = $this->getStoragePathClean();
         $this->preparedPathForStorage = $this->preparePathForStorage();
+        $this->fullPath = $this->getFullPath();
 
         $this->exists = $this->getExists();
 
         $this->size = $this->getSize();
         $this->mimeType = $this->getMimeType();
+        $this->extension = $this->getFileExtension();
         $this->lastModified = $this->getLastModified();
 
+        $this->fixNameWithDifferentExtension();
+
+        $this->directory = str($this->path)->beforeLast('/');
     }
 
     public static function create(array $array): FilePath
@@ -89,8 +95,25 @@ class FilePath
         return RiftStorage::mimeType($this);
     }
 
+    private function getFileExtension(): ?string
+    {
+        return RiftStorage::fileExtension($this);
+    }
+
+    private function fixNameWithDifferentExtension(): void
+    {
+        if (!is_null($this->extension) && !str($this->fileName)->endsWith('.' . $this->extension)) {
+            $this->fileName .= '.' . $this->extension;
+        }
+    }
+
     private function getLastModified(): mixed
     {
         return RiftStorage::lastModified($this);
+    }
+
+    private function getFullPath(): string
+    {
+        return RiftStorageHelper::getFullPath($this->path, $this->disk);
     }
 }

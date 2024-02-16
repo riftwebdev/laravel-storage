@@ -6,18 +6,16 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Riftweb\Storage\Helpers\RiftStorageHelper;
 use Riftweb\Storage\Objects\FilePath;
+use ZipArchive;
+use InvalidArgumentException;
 
 class RiftStorageZip
 {
-    public static function zipFiles(Collection $filePaths): ?FilePath
+    public static function zipFiles(FilePath $zipFilePath, Collection $filePaths): ?FilePath
     {
         try {
-            $path = RiftStorageHelper::ZIP_TEMP_DIR . "/" . str()->uuid()->toString() . '.zip';
-            $pathStorage = Storage::disk('public')->path($path);
-            $pathStorageClean = RiftStorageHelper::getStoragePathClean($path);
-
             $zip = new ZipArchive();
-            $zip->open($pathStorage, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+            $zip->open($zipFilePath->fullPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
 
             foreach ($filePaths as $filePath) {
                 if (!$filePath instanceof FilePath) {
@@ -29,7 +27,11 @@ class RiftStorageZip
 
             $zip->close();
 
-            return new FilePath($pathStorageClean);
+            return FilePath::create([
+                    'path' => $zipFilePath->path,
+                    'fileName' => $zipFilePath->fileName,
+                    'disk' => $filePath->disk
+                ]);
         } catch (Throwable $e) {
             report($e);
         }

@@ -45,4 +45,13 @@ class RiftStorageHelper
 
         return null;
     }
+
+    public static function getFullPath($path, $disk = 'string'): string
+    {
+        try {
+            return Storage::disk($disk)->path($path);
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
 }

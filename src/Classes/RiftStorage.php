@@ -22,9 +22,10 @@ class RiftStorage
 {
     public static function store(
         ?UploadedFile $requestFile,
-        string        $path = '',
-        string        $disk = 'public',
-        bool          $shouldResize = false,
+        string      $path,
+        ?string    $fileName = null,
+        string      $disk = 'public',
+        bool        $shouldResize = false,
         int           $width = 900,
         int           $height = 900
     ): ?FilePath
@@ -34,20 +35,27 @@ class RiftStorage
                 return null;
             }
 
-            $path = $requestFile->store(
-                path: $path,
-                options: ['disk' => $disk]
-            );
-
-            $storageFileUrlClean = RiftStorageHelper::getStoragePathClean($path, $disk);
-
-            $filePath = new FilePath($storageFileUrlClean, disk: null);
+            $storage = Storage::disk($disk);
+            if (!is_null($fileName)) {
+                $existingFilePath = FilePath::create(['path' => $path . '/' . $fileName, 'disk' => $disk]);
+                if ($existingFilePath->exists) {
+                    $existingFilePath->delete();
+                }
+                $requestFilePath = $storage->putFileAs($path, $requestFile, null);
+            } else {
+                $requestFilePath = $storage->putFile($path, $requestFile);
+            }
+            
+            $newFilePath = FilePath::create([
+                'path' => RiftStorageHelper::getStoragePathClean($requestFilePath, $disk),
+                'disk' => $disk
+            ]);
 
             if ($shouldResize) {
-                self::resizeImage($filePath, $width, $height);
+                self::resizeImage($newFilePath, $width, $height);
             }
 
-            return $storageFileUrlClean;
+            return $newFilePath;
 
         } catch (Throwable $e) {
             report($e);
@@ -133,25 +141,6 @@ class RiftStorage
         return false;
     }
 
-    public static function cleanTemporaryZips(): bool
-    {
-        try {
-            $files = self::files(RiftStorageHelper::ZIP_TEMP_DIR);
-
-            if (empty($files)) {
-                return true;
-            }
-
-            foreach ($files as $file) {
-                FilePath::create(['path' => $file])->delete();
-            }
-
-            return true;
-        } catch (Throwable $e) {
-            report($e);
-        }
-    }
-
     public static function download(
         FilePath $filePath
     ): ?StreamedResponse
@@ -176,7 +165,9 @@ class RiftStorage
     public static function exists(FilePath $filePath): bool
     {
         try {
-            return Storage::disk($filePath->disk)->exists($filePath->preparedPathForStorage);
+            $storage = Storage::disk($filePath->disk);
+
+            return $storage->exists($filePath->preparedPathForStorage) && !$storage->directories($filePath->preparedPathForStorage);
         } catch (Throwable $e) {
             report($e);
         }
@@ -184,38 +175,14 @@ class RiftStorage
         return false;
     }
 
-    public static function zipFiles(Collection $filePaths): ?FilePath
-    {
-        try {
-            $path = RiftStorageHelper::ZIP_TEMP_DIR . "/" . str()->uuid()->toString() . '.zip';
-            $pathStorage = Storage::disk('public')->path($path);
-            $pathStorageClean = RiftStorageHelper::getStoragePathClean($path);
-
-            $zip = new ZipArchive();
-            $zip->open($pathStorage, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-
-            foreach ($filePaths as $filePath) {
-                if (!$filePath instanceof FilePath) {
-                    throw new InvalidArgumentException('All elements in the collection must be instances of FilePath');
-                }
-
-                $zip->addFile($filePath->storagePathClean, $filePath->fileName);
-            }
-
-            $zip->close();
-
-            return new FilePath($pathStorageClean);
-        } catch (Throwable $e) {
-            report($e);
-        }
-
-        return null;
-    }
-
     public static function downloadMultiple(Collection $filePaths): ?StreamedResponse
     {
         try {
-            $zipFilePath = self::zipFiles($filePaths);
+            $zipFilePath = FilePath::create([
+                'path' => RiftStorageHelper::ZIP_TEMP_DIR . "/" . str()->uuid()->toString() . '.zip',
+            ]);
+
+            $zipFilePath = RiftStorageZip::zipFiles($zipFilePath, $filePaths);
 
             if (is_null($zipFilePath)) {
                 return null;
@@ -229,7 +196,7 @@ class RiftStorage
         return null;
     }
 
-    public static function files($directory, $disk = 'public', $recursive = false): Collection
+    public static function files($directory = '/', $disk = 'public', $recursive = false): Collection
     {
         try {
             $storage = Storage::disk($disk);
@@ -240,27 +207,34 @@ class RiftStorage
                 $files = $storage->files($directory);
             }
 
-            return ;
+            return collect($files)->transform(function ($file) use ($disk) {
+                return FilePath::create([
+                    'path' => $file,
+                    'disk' => $disk
+                ]);
+            });
         } catch (Throwable $e) {
             report($e);
         }
+
+        return collect();
     }
 
-    public static function directories($directory, $disk = 'public', $recursive = false): array
+    public static function directories($directory = '/', $disk = 'public', $recursive = false): Collection
     {
         try {
             $storage = Storage::disk($disk);
             if ($recursive) {
-                return $storage->allDirectories($directory);
+                return collect($storage->allDirectories($directory));
             }
 
-            return $storage->directories($directory);
+            return collect($storage->directories($directory));
 
         } catch (Throwable $e) {
             report($e);
         }
 
-        return [];
+        return collect();
     }
 
     public static function size(FilePath $filePath): ?int
@@ -281,6 +255,20 @@ class RiftStorage
         try {
             if ($filePath->exists) {
                 return Storage::disk($filePath->disk)->mimeType($filePath->preparedPathForStorage);
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return null;
+    }
+
+    public static function fileExtension(FilePath $filePath): ?string {
+        try {
+            $fileExtension = pathinfo($filePath->path, PATHINFO_EXTENSION);
+
+            if (str($fileExtension)->isNotEmpty()) {
+                return $fileExtension;
             }
         } catch (Throwable $e) {
             report($e);
