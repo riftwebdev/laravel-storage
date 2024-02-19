@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use Riftweb\Storage\Helpers\RiftStorageHelper;
 use Riftweb\Storage\Objects\FilePath;
 use ZipArchive;
+use Throwable;
 use InvalidArgumentException;
 
 class RiftStorageZip
@@ -42,19 +43,19 @@ class RiftStorageZip
     public static function deleteTemporaryZips(): bool
     {
         try {
-            $files = self::files(RiftStorageHelper::ZIP_TEMP_DIR);
+            $files = RiftStorage::files(RiftStorageHelper::ZIP_TEMP_DIR);
 
-            if (empty($files)) {
+            if ($files->isEmpty()) {
                 return true;
             }
 
             foreach ($files as $file) {
-                FilePath::create(['path' => $file])->delete();
+                $file->delete();
             }
-
-            return true;
         } catch (Throwable $e) {
             report($e);
         }
+
+        return true;
     }
 }

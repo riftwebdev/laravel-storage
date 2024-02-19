@@ -3,6 +3,7 @@
 namespace Riftweb\Storage\Helpers;
 
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class RiftStorageHelper
 {

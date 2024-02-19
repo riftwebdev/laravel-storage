@@ -12,6 +12,8 @@ class FilePath
     public string $storagePathClean;
     public string $realFileName;
     public string $preparedPathForStorage;
+    public ?string $fullPath;
+    public ?string $directory;
     public ?int $size;
     public ?string $mimeType;
     public ?string $extension;
@@ -30,8 +32,8 @@ class FilePath
             $this->fileName = $this->realFileName;
         }
 
-        $this->storagePathClean = $this->getStoragePathClean();
         $this->preparedPathForStorage = $this->preparePathForStorage();
+        $this->storagePathClean = $this->getStoragePathClean();
         $this->fullPath = $this->getFullPath();
 
         $this->exists = $this->getExists();
@@ -77,7 +79,7 @@ class FilePath
 
     private function getStoragePathClean(): string
     {
-        return RiftStorageHelper::getStoragePathClean($this->path, $this->disk);
+        return RiftStorageHelper::getStoragePathClean($this->preparedPathForStorage, $this->disk);
     }
 
     private function preparePathForStorage(): string
