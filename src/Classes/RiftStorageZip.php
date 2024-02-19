@@ -43,6 +43,8 @@ class RiftStorageZip
     public static function deleteTemporaryZips(): bool
     {
         try {
+            self::checkTemporaryZipDirectoryAndCreate();
+            
             $files = RiftStorage::files(RiftStorageHelper::ZIP_TEMP_DIR);
 
             if ($files->isEmpty()) {
@@ -51,6 +53,19 @@ class RiftStorageZip
 
             foreach ($files as $file) {
                 $file->delete();
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return true;
+    }
+
+    public static function checkTemporaryZipDirectoryAndCreate(): bool
+    {
+        try {
+            if (!RiftStorage::exists(RiftStorageHelper::ZIP_TEMP_DIR)) {
+                return RiftStorage::makeDirectory(RiftStorageHelper::ZIP_TEMP_DIR, true);
             }
         } catch (Throwable $e) {
             report($e);
