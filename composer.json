@@ -19,7 +19,7 @@
     ],
     "homepage": "https://gitlab.com/riftwebdev/laravel-storage",
     "require": {
-        "php": "^7.3|^8.0",
+        "php": "^8.0",
         "spatie/image": "^3.3"
     },
     "require-dev": {

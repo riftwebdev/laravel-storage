@@ -178,7 +178,7 @@ class RiftStorage
     public static function downloadMultiple(Collection $filePaths): ?StreamedResponse
     {
         try {
-            RiftStorageZip::checkTemporaryZipDirectoryAndCreate();
+            RiftStorageZip::createTemporaryZipDirectory();
 
             $zipFilePath = FilePath::create([
                 'path' => RiftStorageHelper::ZIP_TEMP_DIR . "/" . str()->uuid()->toString() . '.zip',
@@ -239,10 +239,14 @@ class RiftStorage
         return collect();
     }
 
-    public static function makeDirectory($directory = '/', $recursive = false)
+    public static function makeDirectory(FilePath $filePath, string $permissions = "0777", $recursive = false)
     {
         try {
-            return Storage::makeDirectory($directory, 0777, $recursive);
+            if ($filePath->exists) {
+                return true;
+            }
+
+            return Storage::disk($filePath->disk)->makeDirectory($filePath->path, $permissions, $recursive);
         } catch (Throwable $e) {
             report($e);
         }

@@ -6,8 +6,11 @@ use Illuminate\Support\Carbon;
 use Riftweb\Storage\Classes\RiftStorage;
 use Riftweb\Storage\Helpers\RiftStorageHelper;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Contracts\Mail\Attachable;
+use Illuminate\Mail\Attachment;
 
-class FilePath
+
+class FilePath implements Attachable
 {
     public string $storagePathClean;
     public string $realFileName;
@@ -70,6 +73,13 @@ class FilePath
     public function delete(): bool
     {
         return RiftStorage::delete($this);
+    }
+
+    // This method is from the Attachable interface
+    public function toMailAttachment(): Attachment
+    {
+        return Attachment::fromStorageDisk($this->disk, $this->preparedPathForStorage)
+            ->as($file->fileName);
     }
 
     private function getExists(): bool
