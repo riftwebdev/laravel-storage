@@ -79,7 +79,7 @@ class FilePath implements Attachable
     public function toMailAttachment(): Attachment
     {
         return Attachment::fromStorageDisk($this->disk, $this->preparedPathForStorage)
-            ->as($file->fileName);
+            ->as($this->fileName);
     }
 
     private function getExists(): bool
