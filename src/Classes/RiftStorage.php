@@ -254,6 +254,17 @@ class RiftStorage
         return false;
     }
 
+    public static function deleteDirectory(FilePath $filePath)
+    {
+        try {
+            return Storage::disk($filePath->disk)->deleteDirectory($filePath->path);
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return false;
+    }
+
     public static function size(FilePath $filePath): ?int
     {
         try {
