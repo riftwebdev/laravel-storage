@@ -2,15 +2,12 @@
 
 namespace Riftweb\Storage\Objects;
 
-use Illuminate\Support\Carbon;
-use Riftweb\Storage\Classes\RiftStorage;
-use Riftweb\Storage\Helpers\RiftStorageHelper;
-use Symfony\Component\HttpFoundation\StreamedResponse;
-use Illuminate\Contracts\Mail\Attachable;
-use Illuminate\Mail\Attachment;
+use Carbon\Carbon;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
 
-
-class FilePath implements Attachable
+class FilePath
 {
     public string $storagePathClean;
     public string $realFileName;
@@ -24,108 +21,127 @@ class FilePath implements Attachable
     public bool $exists;
 
     public function __construct(
-        public string $path,
-        public ?string $fileName = null,
-        public string $disk = 'public'
-    )
-    {
-        $this->realFileName = $this->realFileName();
-
-        if (is_null($this->fileName)) {
-            $this->fileName = $this->realFileName;
+        string $path,
+        ?string $fileName = null,
+        string $disk = 'public'
+    ) {
+        if (empty($path)) {
+            throw new InvalidArgumentException('Path cannot be empty');
         }
 
+        $this->path = $path;
+        $this->fileName = $fileName;
+        $this->disk = $disk;
+        
+        $this->realFileName = $this->realFileName();
+        $this->fileName ??= $this->realFileName;
+        
+        $this->directory = Str::beforeLast($path, '/');
         $this->preparedPathForStorage = $this->preparePathForStorage();
         $this->storagePathClean = $this->getStoragePathClean();
         $this->fullPath = $this->getFullPath();
-
         $this->exists = $this->getExists();
-
-        $this->size = $this->getSize();
-        $this->mimeType = $this->getMimeType();
-        $this->extension = $this->getFileExtension();
-        $this->lastModified = $this->getLastModified();
-
+        
+        $this->updateFileProperties();
         $this->fixNameWithDifferentExtension();
-
-        $this->directory = str($this->path)->beforeLast('/');
     }
 
-    public static function create(array $array): FilePath
+    private function updateFileProperties(): void
+    {
+        if (!$this->exists) {
+            return;
+        }
+
+        $disk = Storage::disk($this->disk);
+        
+        $this->size = $disk->size($this->preparedPathForStorage);
+        $this->mimeType = $disk->mimeType($this->preparedPathForStorage);
+        $this->extension = pathinfo($this->preparedPathForStorage, PATHINFO_EXTENSION);
+        $this->lastModified = Carbon::createFromTimestamp($disk->lastModified($this->preparedPathForStorage));
+    }
+
+    public static function create(array $attributes): self
     {
         return new self(
-            $array['path'],
-            $array['fileName'] ?? null,
-            $array['disk'] ?? 'public'
+            $attributes['path'] ?? '',
+            $attributes['fileName'] ?? null,
+            $attributes['disk'] ?? 'public'
         );
     }
 
-    public function realFileName(): string
+    private function realFileName(): string
     {
-        return str($this->path)->afterLast('/');
-    }
-
-    public function download(): ?StreamedResponse
-    {
-        return RiftStorage::download($this);
-    }
-
-    public function delete(): bool
-    {
-        return RiftStorage::delete($this);
-    }
-
-    // This method is from the Attachable interface
-    public function toMailAttachment(): Attachment
-    {
-        return Attachment::fromStorageDisk($this->disk, $this->preparedPathForStorage)
-            ->as($this->fileName);
-    }
-
-    private function getExists(): bool
-    {
-        return RiftStorage::exists($this);
-    }
-
-    private function getStoragePathClean(): string
-    {
-        return RiftStorageHelper::getStoragePathClean($this->preparedPathForStorage, $this->disk);
+        return pathinfo($this->path, PATHINFO_FILENAME);
     }
 
     private function preparePathForStorage(): string
     {
-        return RiftStorageHelper::preparePathForStorage($this->path);
+        return Str::replaceFirst(['storage/', '/storage/'], '', $this->path);
     }
 
-    private function getSize(): mixed
+    private function getStoragePathClean(): ?string
     {
-        return RiftStorage::size($this);
+        try {
+            return Str::replaceFirst(config('app.url'), '', Storage::disk($this->disk)->url($this->path));
+        } catch (\Exception $e) {
+            report($e);
+            return null;
+        }
     }
 
-    private function getMimeType(): mixed
+    private function getFullPath(): ?string
     {
-        return RiftStorage::mimeType($this);
+        try {
+            return Storage::disk($this->disk)->path($this->preparedPathForStorage);
+        } catch (\Exception $e) {
+            report($e);
+            return null;
+        }
+    }
+
+    private function getExists(): bool
+    {
+        try {
+            return Storage::disk($this->disk)->exists($this->preparedPathForStorage);
+        } catch (\Exception $e) {
+            report($e);
+            return false;
+        }
+    }
+
+    private function getSize(): ?int
+    {
+        return $this->exists ? Storage::disk($this->disk)->size($this->preparedPathForStorage) : null;
+    }
+
+    private function getMimeType(): ?string
+    {
+        return $this->exists ? Storage::disk($this->disk)->mimeType($this->preparedPathForStorage) : null;
     }
 
     private function getFileExtension(): ?string
     {
-        return RiftStorage::fileExtension($this);
+        return $this->exists ? pathinfo($this->preparedPathForStorage, PATHINFO_EXTENSION) : null;
+    }
+
+    private function getLastModified(): ?Carbon
+    {
+        return $this->exists ? 
+            Carbon::createFromTimestamp(Storage::disk($this->disk)->lastModified($this->preparedPathForStorage)) : 
+            null;
     }
 
     private function fixNameWithDifferentExtension(): void
     {
-        if (!is_null($this->extension) && !str($this->fileName)->endsWith('.' . $this->extension)) {
-            $this->fileName .= '.' . $this->extension;
+        if (!$this->exists || empty($this->fileName)) {
+            return;
         }
-    }
 
-    private function getLastModified(): mixed
-    {
-        return RiftStorage::lastModified($this);
-    }
+        $fileExtension = pathinfo($this->fileName, PATHINFO_EXTENSION);
+        $pathExtension = pathinfo($this->preparedPathForStorage, PATHINFO_EXTENSION);
 
-    private function getFullPath(): string
-    {
-        return RiftStorageHelper::getFullPath($this->path, $this->disk);
+        if ($fileExtension !== $pathExtension) {
+            $this->fileName = pathinfo($this->fileName, PATHINFO_FILENAME) . '.' . $pathExtension;
+        }
     }
 }
