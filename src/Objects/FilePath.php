@@ -55,8 +55,8 @@ class FilePath implements Attachable
     {
         return new self(
             $array['path'],
-                $array['fileName'] ?? null,
-                $array['disk'] ?? 'public'
+            $array['fileName'] ?? null,
+            $array['disk'] ?? 'public'
         );
     }
 

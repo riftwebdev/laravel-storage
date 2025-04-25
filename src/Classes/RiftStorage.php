@@ -45,7 +45,7 @@ class RiftStorage
             } else {
                 $requestFilePath = $storage->putFile($path, $requestFile);
             }
-            
+
             $newFilePath = FilePath::create([
                 'path' => RiftStorageHelper::getStoragePathClean($requestFilePath, $disk),
                 'disk' => $disk
@@ -73,12 +73,12 @@ class RiftStorage
     ): bool
     {
         try {
-            $publicPath = public_path($filePath->path);
-
-            return Image::useImageDriver(ImageDriver::Gd)
-                ->loadFile($publicPath)
+            Image::useImageDriver(ImageDriver::Gd)
+                ->loadFile($filePath->fullPath)
                 ->fit(Fit::Contain, $width, $height)
-                ->save($publicPath);
+                ->save($filePath->fullPath);
+
+            return true;
         } catch (Throwable $e) {
             report($e);
             return false;
