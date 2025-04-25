@@ -73,6 +73,10 @@ class RiftStorage
     ): bool
     {
         try {
+            if (!$filePath->exists) {
+                throw new FileNotFoundException($filePath);
+            }
+
             Image::useImageDriver(ImageDriver::Gd)
                 ->loadFile($filePath->fullPath)
                 ->fit(Fit::Contain, $width, $height)
