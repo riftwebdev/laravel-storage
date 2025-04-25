@@ -3,6 +3,7 @@
 namespace Riftweb\Storage\Helpers;
 
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Throwable;
 
 class RiftStorageHelper
@@ -12,45 +13,37 @@ class RiftStorageHelper
     public static function getDomain(): string
     {
         $domain = config('app.url');
-        if (!str($domain)->endsWith('/')) {
-            $domain .= '/';
-        }
-
-        return $domain;
+        return Str::ensureLeft($domain, '/');
     }
 
     public static function preparePathForStorage(string $path): ?string
     {
-        $startsWithStorageSlash = str($path)->startsWith('storage/');
-        $startsWithSlashStorageSlash = str($path)->startsWith('/storage/');
-        if (str($path)->isEmpty() || (!$startsWithSlashStorageSlash && !$startsWithStorageSlash)) {
+        if (empty($path)) {
             return $path;
         }
 
-        if ($startsWithSlashStorageSlash) {
-            return str($path)->replaceFirst('/storage/', '');
+        if (Str::startsWith($path, ['storage/', '/storage/'])) {
+            return Str::replaceFirst(['storage/', '/storage/'], '', $path);
         }
 
-        return str($path)->replaceFirst('storage/', '');
+        return $path;
     }
 
-    public static function getStoragePathClean($path, $disk = 'public'): ?string
+    public static function getStoragePathClean(string $path, string $disk = 'public'): ?string
     {
         try {
             $storageFileUrl = Storage::disk($disk)->url($path);
-
-            return str_replace(RiftStorageHelper::getDomain(), '', $storageFileUrl);
+            return Str::replaceFirst(config('app.url'), '', $storageFileUrl);
         } catch (Throwable $e) {
             report($e);
+            return null;
         }
-
-        return null;
     }
 
-    public static function getFullPath($path, $disk = 'string'): string
+    public static function getFullPath(string $path, string $disk = 'public'): string
     {
         try {
-            return Storage::disk($disk)->path($path);
+            return Storage::disk($disk)->path(Str::replaceFirst('storage/', '', $path));
         } catch (Throwable $e) {
             report($e);
         }

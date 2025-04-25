@@ -45,7 +45,7 @@ class RiftStorage
             } else {
                 $requestFilePath = $storage->putFile($path, $requestFile);
             }
-            
+
             $newFilePath = FilePath::create([
                 'path' => RiftStorageHelper::getStoragePathClean($requestFilePath, $disk),
                 'disk' => $disk
@@ -73,12 +73,12 @@ class RiftStorage
     ): bool
     {
         try {
-            $publicPath = public_path($filePath->path);
-
-            return Image::useImageDriver(ImageDriver::Gd)
-                ->loadFile($publicPath)
+            Image::useImageDriver(ImageDriver::Gd)
+                ->loadFile($filePath->fullPath)
                 ->fit(Fit::Contain, $width, $height)
-                ->save($publicPath);
+                ->save($filePath->fullPath);
+
+            return true;
         } catch (Throwable $e) {
             report($e);
             return false;
@@ -265,55 +265,43 @@ class RiftStorage
         return false;
     }
 
-    public static function size(FilePath $filePath): ?int
+    private static function getStorageDisk(FilePath $filePath)
     {
         try {
-            if ($filePath->exists) {
-                return Storage::disk($filePath->disk)->size($filePath->preparedPathForStorage);
+            if (!$filePath->exists) {
+                return null;
             }
-
+            
+            return Storage::disk($filePath->disk);
         } catch (Throwable $e) {
             report($e);
+            return null;
         }
-
-        return null;
     }
 
-    public static function mimeType(FilePath $filePath): ?string {
-        try {
-            if ($filePath->exists) {
-                return Storage::disk($filePath->disk)->mimeType($filePath->preparedPathForStorage);
-            }
-        } catch (Throwable $e) {
-            report($e);
-        }
-
-        return null;
+    public static function size(FilePath $filePath): ?int
+    {
+        $disk = self::getStorageDisk($filePath);
+        return $disk ? $disk->size($filePath->preparedPathForStorage) : null;
     }
 
-    public static function fileExtension(FilePath $filePath): ?string {
-        try {
-            $fileExtension = pathinfo($filePath->path, PATHINFO_EXTENSION);
-
-            if (str($fileExtension)->isNotEmpty()) {
-                return $fileExtension;
-            }
-        } catch (Throwable $e) {
-            report($e);
-        }
-
-        return null;
+    public static function mimeType(FilePath $filePath): ?string
+    {
+        $disk = self::getStorageDisk($filePath);
+        return $disk ? $disk->mimeType($filePath->preparedPathForStorage) : null;
     }
 
-    public static function lastModified(FilePath $filePath): ?Carbon {
-        try {
-            if ($filePath->exists) {
-                return Carbon::createFromTimestamp(Storage::disk($filePath->disk)->lastModified($filePath->preparedPathForStorage));
-            }
-        } catch (Throwable $e) {
-            report($e);
-        }
+    public static function fileExtension(FilePath $filePath): ?string
+    {
+        $disk = self::getStorageDisk($filePath);
+        return $disk ? pathinfo($filePath->preparedPathForStorage, PATHINFO_EXTENSION) : null;
+    }
 
-        return null;
+    public static function lastModified(FilePath $filePath): ?Carbon
+    {
+        $disk = self::getStorageDisk($filePath);
+        $timestamp = $disk ? $disk->lastModified($filePath->preparedPathForStorage) : null;
+        
+        return $timestamp ? Carbon::createFromTimestamp($timestamp) : null;
     }
 }
